@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>backtiming</title>
+<style>
+  :root { --bg: #fafaf9; --fg: #1c1917; --muted: #78716c; --line: #e7e5e4; --prep: #2563eb; --busy: #d6d3d1; --bad: #dc2626; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1c1917; --fg: #f5f5f4; --muted: #a8a29e; --line: #44403c; --prep: #60a5fa; --busy: #57534e; --bad: #f87171; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  h2 { font-size: 16px; margin: 32px 0 8px; }
+  .muted { color: var(--muted); }
+  form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+  label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); }
+  input { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--fg); }
+  input[type=number] { width: 90px; }
+  button { font: inherit; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--fg); color: var(--bg); cursor: pointer; }
+  button.ghost { background: transparent; color: var(--muted); padding: 2px 8px; }
+  button:disabled { opacity: .4; cursor: default; }
+  ul { list-style: none; padding: 0; margin: 8px 0; }
+  li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  li.event { cursor: pointer; }
+  li.selected { font-weight: 600; }
+  .day { margin-top: 16px; font-weight: 600; }
+  .slot { display: flex; gap: 12px; padding: 4px 8px; border-left: 4px solid var(--busy); margin: 4px 0; }
+  .slot.prep { border-color: var(--prep); }
+  .slot .time { width: 110px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .bad { color: var(--bad); }
+  .banner { padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; margin-top: 16px; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>backtiming</h1>
+  <div class="muted">Plan backwards from the big days.</div>
+  <div class="banner" id="status"></div>
+
+  <h2>Events</h2>
+  <form id="event-form">
+    <label>Title<input name="title" required placeholder="Wedding"></label>
+    <label>Starts<input name="start" type="datetime-local" required></label>
+    <label>Prep from (days)<input name="horizon_days" type="number" min="1" value="14"></label>
+    <button>Add event</button>
+  </form>
+  <ul id="events"></ul>
+
+  <section id="detail" hidden>
+    <h2 id="detail-title"></h2>
+    <form id="task-form">
+      <label>Task<input name="title" required placeholder="Buy suit"></label>
+      <label>Minutes<input name="minutes" type="number" min="5" value="60"></label>
+      <label>Done by (days before)<input name="due_days_before" type="number" min="0" value="0"></label>
+      <button>Add task</button>
+    </form>
+    <ul id="tasks"></ul>
+    <button id="plan-btn">Plan</button>
+    <button id="push-btn" disabled>Push to Google Calendar</button>
+    <div id="plan"></div>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+let selected = null;
+let google = false;
+
+async function api(path, options = {}) {
+  const res = await fetch('/api' + path, { headers: { 'Content-Type': 'application/json' }, ...options });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.detail || res.statusText);
+  return body;
+}
+
+const fmtDay = d => d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+const fmtTime = d => d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+const formData = form => Object.fromEntries(new FormData(form));
+
+function li(html, onDelete) {
+  const item = document.createElement('li');
+  item.innerHTML = `<span>${html}</span>`;
+  const del = document.createElement('button');
+  del.className = 'ghost';
+  del.textContent = '×';
+  del.onclick = e => { e.stopPropagation(); onDelete(); };
+  item.append(del);
+  return item;
+}
+
+async function loadEvents() {
+  const events = await api('/events');
+  $('#events').replaceChildren(...events.map(ev => {
+    const start = new Date(ev.start);
+    const item = li(`${ev.title} <span class="muted">· ${fmtDay(start)} ${fmtTime(start)}</span>`, async () => {
+      await api(`/events/${ev.id}`, { method: 'DELETE' });
+      if (selected?.id === ev.id) { selected = null; $('#detail').hidden = true; }
+      loadEvents();
+    });
+    item.classList.add('event');
+    if (selected?.id === ev.id) item.classList.add('selected');
+    item.onclick = () => select(ev);
+    return item;
+  }));
+}
+
+async function select(ev) {
+  selected = ev;
+  $('#detail').hidden = false;
+  $('#detail-title').textContent = `Prep for ${ev.title}`;
+  $('#plan').replaceChildren();
+  loadEvents();
+  loadTasks();
+}
+
+async function loadTasks() {
+  const tasks = await api(`/events/${selected.id}/tasks`);
+  $('#tasks').replaceChildren(...tasks.map(t => li(
+    `${t.title} <span class="muted">· ${t.minutes} min${t.due_days_before ? ` · ${t.due_days_before}d before` : ''}</span>`,
+    async () => { await api(`/tasks/${t.id}`, { method: 'DELETE' }); loadTasks(); }
+  )));
+}
+
+async function showPlan() {
+  const plan = await api(`/events/${selected.id}/plan`);
+  const slots = [
+    ...plan.busy.map(b => ({ ...b, title: 'Busy', kind: 'busy' })),
+    ...plan.allocations.map(a => ({ ...a, kind: 'prep' })),
+  ].map(s => ({ ...s, start: new Date(s.start), end: new Date(s.end) }))
+   .filter(s => plan.allocations.length === 0 || s.kind === 'prep' || nearPrep(s, plan.allocations))
+   .sort((a, b) => a.start - b.start);
+
+  const out = [];
+  if (plan.source === 'demo') out.push(el('p', 'muted', 'Using demo busy times (weekdays 9–17, dinner 19–20).'));
+  if (plan.unplaced.length) out.push(el('p', 'bad', `Could not fit: ${plan.unplaced.map(t => t.title).join(', ')}`));
+  if (!plan.allocations.length) out.push(el('p', 'muted', 'Nothing scheduled yet. Add some tasks.'));
+  let day = '';
+  for (const s of slots) {
+    if (fmtDay(s.start) !== day) { day = fmtDay(s.start); out.push(el('div', 'day', day)); }
+    const row = el('div', `slot ${s.kind}`);
+    row.append(el('span', 'time', `${fmtTime(s.start)}–${fmtTime(s.end)}`), el('span', '', s.title));
+    out.push(row);
+  }
+  $('#plan').replaceChildren(...out);
+  $('#push-btn').disabled = !google || !plan.allocations.length;
+}
+
+function nearPrep(slot, allocations) {
+  const days = new Set(allocations.map(a => fmtDay(new Date(a.start))));
+  return days.has(fmtDay(slot.start));
+}
+
+function el(tag, cls, text = '') {
+  const node = document.createElement(tag);
+  node.className = cls;
+  node.textContent = text;
+  return node;
+}
+
+$('#event-form').onsubmit = async e => {
+  e.preventDefault();
+  const data = formData(e.target);
+  const ev = await api('/events', { method: 'POST', body: JSON.stringify({ ...data, start: new Date(data.start).toISOString() }) });
+  e.target.reset();
+  select(ev);
+};
+
+$('#task-form').onsubmit = async e => {
+  e.preventDefault();
+  await api(`/events/${selected.id}/tasks`, { method: 'POST', body: JSON.stringify(formData(e.target)) });
+  e.target.title.value = '';
+  loadTasks();
+};
+
+$('#plan-btn').onclick = () => showPlan().catch(err => alert(err.message));
+
+$('#push-btn').onclick = async () => {
+  try {
+    const res = await api(`/events/${selected.id}/push`, { method: 'POST' });
+    alert(`Wrote ${res.written} blocks to your backtiming calendar.`);
+  } catch (err) { alert(err.message); }
+};
+
+api('/status').then(s => {
+  google = s.google;
+  $('#status').textContent = google
+    ? 'Connected to Google Calendar. Prep blocks go to your "backtiming" calendar.'
+    : 'Demo mode: no credentials.json found, so busy times are simulated and pushing is disabled.';
+});
+loadEvents();
+</script>
+</body>
+</html>
