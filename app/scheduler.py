@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 
 from app.models import Allocation, Block, Event, Task
 
@@ -28,6 +28,21 @@ def free_gaps(start: datetime, end: datetime, busy: list[Block], buffer: timedel
     return [(s, e) for s, e in gaps if s < e]
 
 
+def at_local(day: date, t: time, tz: tzinfo | None) -> datetime:
+    naive = datetime.combine(day, t)
+    return naive.replace(tzinfo=tz) if tz else naive.astimezone()
+
+
+def sleep_blocks(start: datetime, end: datetime, sleep_start: time, sleep_end: time, tz: tzinfo | None = None) -> list[Block]:
+    day = start.astimezone(tz).date() - timedelta(days=1)
+    blocks = []
+    while day <= end.astimezone(tz).date():
+        wake_day = day + timedelta(days=1) if sleep_end <= sleep_start else day
+        blocks.append(Block(start=at_local(day, sleep_start, tz), end=at_local(wake_day, sleep_end, tz)))
+        day += timedelta(days=1)
+    return blocks
+
+
 def subtract(gaps: list[tuple[datetime, datetime]], start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
     result = []
     for gap_start, gap_end in gaps:
@@ -49,6 +64,8 @@ def place(task: Task, deadline: datetime, gaps: list[tuple[datetime, datetime]],
         if gap_end <= gap_start:
             continue
         size = min(remaining, gap_end - gap_start)
+        if timedelta(0) < remaining - size < min_chunk:
+            size = remaining - min_chunk
         if size < remaining and size < min_chunk:
             continue
         chosen.append((gap_end - size, gap_end))
@@ -63,11 +80,14 @@ def allocate(
     tasks: list[Task],
     busy: list[Block],
     now: datetime,
+    blocked: tuple[Block, ...] | list[Block] = (),
     buffer: timedelta = timedelta(minutes=15),
     min_chunk: timedelta = timedelta(minutes=30),
 ) -> tuple[list[Allocation], list[Task]]:
     window_start = max(now, event.start - timedelta(days=event.horizon_days))
     gaps = free_gaps(window_start, event.start - buffer, busy, buffer)
+    for block in blocked:
+        gaps = subtract(gaps, block.start, block.end)
     allocations, unplaced = [], []
     for task in sorted(tasks, key=lambda t: t.due_days_before):
         deadline = event.start - timedelta(days=task.due_days_before)

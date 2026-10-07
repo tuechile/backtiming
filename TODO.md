@@ -11,13 +11,17 @@
 
 ## Next
 
-- [ ] Reusable task templates per event type (e.g. wedding, move, launch, exam)
+- [x] Reusable task templates per event type (e.g. wedding, move, launch, exam)
+- [ ] Edit a template's tasks directly (today: apply, tweak, save under the same name)
 - [ ] Re-run allocation when the calendar changes; update or remove stale blocks
 - [ ] Settings page:
-  - [ ] Available hours per weekday (default 24/7)
-  - [ ] Blocked times (e.g. sleep, commute)
+  - [x] Sleep hours (default 02:00–09:00, can be turned off)
+  - [ ] Weekly blocked times (e.g. work, commute, gym), per weekday
+  - [ ] Daily cap on prep time (e.g. at most 3h/day)
   - [ ] Buffer size and minimum chunk length
-  - [ ] Timezone
+  - [ ] Timezone (today: the machine's local time)
+  - [ ] Which Google calendars count as busy
+  - [ ] Scheduling style: as late as possible vs. spread out evenly
 
 ## Later
 

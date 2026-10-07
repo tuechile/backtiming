@@ -17,6 +17,9 @@
   label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); }
   input { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--fg); }
   input[type=number] { width: 90px; }
+  select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+  .template-tasks { font-size: 13px; color: var(--muted); margin: 0 0 8px 12px; }
   button { font: inherit; padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--fg); color: var(--bg); cursor: pointer; }
   button.ghost { background: transparent; color: var(--muted); padding: 2px 8px; }
   button:disabled { opacity: .4; cursor: default; }
@@ -42,6 +45,7 @@
   <form id="event-form">
     <label>Title<input name="title" required placeholder="Wedding"></label>
     <label>Starts<input name="start" type="datetime-local" required></label>
+    <label>Template<select name="template_id" class="template-select"><option value="">None</option></select></label>
     <label>Prep from (days)<input name="horizon_days" type="number" min="1" value="14"></label>
     <button>Add event</button>
   </form>
@@ -56,15 +60,36 @@
       <button>Add task</button>
     </form>
     <ul id="tasks"></ul>
-    <button id="plan-btn">Plan</button>
-    <button id="push-btn" disabled>Push to Google Calendar</button>
+    <div class="row">
+      <select id="apply-select" class="template-select"><option value="">Add tasks from template…</option></select>
+      <button id="apply-btn" class="ghost">Add</button>
+      <button id="save-template-btn" class="ghost">Save tasks as template</button>
+    </div>
+    <div class="row">
+      <button id="plan-btn">Plan</button>
+      <button id="push-btn" disabled>Push to Google Calendar</button>
+    </div>
     <div id="plan"></div>
   </section>
+
+  <h2>Templates</h2>
+  <div class="muted">Reusable prep lists per event type. Click one to see its tasks.</div>
+  <ul id="templates"></ul>
+
+  <h2>Settings</h2>
+  <form id="settings-form">
+    <label>Avoid sleep hours<input name="sleep_enabled" type="checkbox"></label>
+    <label>Sleep from<input name="sleep_start" type="time" required></label>
+    <label>Wake at<input name="sleep_end" type="time" required></label>
+    <button>Save</button>
+    <span id="settings-saved" class="muted"></span>
+  </form>
 </main>
 <script>
 const $ = s => document.querySelector(s);
 let selected = null;
 let google = false;
+let templates = [];
 
 async function api(path, options = {}) {
   const res = await fetch('/api' + path, { headers: { 'Content-Type': 'application/json' }, ...options });
@@ -101,6 +126,27 @@ async function loadEvents() {
     if (selected?.id === ev.id) item.classList.add('selected');
     item.onclick = () => select(ev);
     return item;
+  }));
+}
+
+async function loadTemplates() {
+  templates = await api('/templates');
+  for (const select of document.querySelectorAll('.template-select')) {
+    select.replaceChildren(select.options[0], ...templates.map(t => new Option(t.name, t.id)));
+  }
+  $('#templates').replaceChildren(...templates.map(t => {
+    const item = li(
+      `${t.name} <span class="muted">· ${t.tasks.length} tasks · ${t.horizon_days}d lead</span>`,
+      async () => { if (confirm(`Delete template "${t.name}"?`)) { await api(`/templates/${t.id}`, { method: 'DELETE' }); loadTemplates(); } }
+    );
+    item.classList.add('event');
+    const details = el('div', 'template-tasks');
+    details.hidden = true;
+    details.innerHTML = t.tasks.map(task => `${task.title} · ${task.minutes} min${task.due_days_before ? ` · ${task.due_days_before}d before` : ''}`).join('<br>');
+    item.onclick = () => { details.hidden = !details.hidden; };
+    const wrap = document.createDocumentFragment();
+    wrap.append(item, details);
+    return wrap;
   }));
 }
 
@@ -160,7 +206,8 @@ function el(tag, cls, text = '') {
 $('#event-form').onsubmit = async e => {
   e.preventDefault();
   const data = formData(e.target);
-  const ev = await api('/events', { method: 'POST', body: JSON.stringify({ ...data, start: new Date(data.start).toISOString() }) });
+  const body = { ...data, start: new Date(data.start).toISOString(), template_id: data.template_id || null };
+  const ev = await api('/events', { method: 'POST', body: JSON.stringify(body) });
   e.target.reset();
   select(ev);
 };
@@ -170,6 +217,43 @@ $('#task-form').onsubmit = async e => {
   await api(`/events/${selected.id}/tasks`, { method: 'POST', body: JSON.stringify(formData(e.target)) });
   e.target.title.value = '';
   loadTasks();
+};
+
+$('#event-form').template_id.onchange = e => {
+  const template = templates.find(t => t.id == e.target.value);
+  if (template) e.target.form.horizon_days.value = template.horizon_days;
+};
+
+$('#apply-btn').onclick = async () => {
+  if (!$('#apply-select').value) return;
+  await api(`/events/${selected.id}/apply-template/${$('#apply-select').value}`, { method: 'POST' });
+  $('#apply-select').value = '';
+  loadTasks();
+};
+
+$('#save-template-btn').onclick = async () => {
+  const name = prompt('Template name (an existing name will be replaced):', selected.title);
+  if (!name) return;
+  await api(`/events/${selected.id}/save-template`, { method: 'POST', body: JSON.stringify({ name }) });
+  loadTemplates();
+};
+
+async function loadSettings() {
+  const settings = await api('/settings');
+  const form = $('#settings-form');
+  form.sleep_enabled.checked = settings.sleep_enabled;
+  form.sleep_start.value = settings.sleep_start.slice(0, 5);
+  form.sleep_end.value = settings.sleep_end.slice(0, 5);
+}
+
+$('#settings-form').onsubmit = async e => {
+  e.preventDefault();
+  const form = e.target;
+  const body = { sleep_enabled: form.sleep_enabled.checked, sleep_start: form.sleep_start.value, sleep_end: form.sleep_end.value };
+  await api('/settings', { method: 'PUT', body: JSON.stringify(body) });
+  $('#settings-saved').textContent = 'Saved';
+  setTimeout(() => { $('#settings-saved').textContent = ''; }, 1500);
+  if (selected && $('#plan').childElementCount) showPlan();
 };
 
 $('#plan-btn').onclick = () => showPlan().catch(err => alert(err.message));
@@ -188,6 +272,8 @@ api('/status').then(s => {
     : 'Demo mode: no credentials.json found, so busy times are simulated and pushing is disabled.';
 });
 loadEvents();
+loadTemplates();
+loadSettings();
 </script>
 </body>
 </html>

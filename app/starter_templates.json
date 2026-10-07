@@ -1,0 +1,72 @@
+[
+  {
+    "name": "Wedding (guest)",
+    "horizon_days": 21,
+    "tasks": [
+      {"title": "Buy outfit", "minutes": 120, "due_days_before": 10},
+      {"title": "Buy gift", "minutes": 60, "due_days_before": 5},
+      {"title": "Tailoring fitting", "minutes": 60, "due_days_before": 3},
+      {"title": "Haircut", "minutes": 60, "due_days_before": 2},
+      {"title": "Write card or toast", "minutes": 90, "due_days_before": 1},
+      {"title": "Iron outfit and pack bag", "minutes": 45, "due_days_before": 0}
+    ]
+  },
+  {
+    "name": "Moving house",
+    "horizon_days": 30,
+    "tasks": [
+      {"title": "Book movers", "minutes": 60, "due_days_before": 21},
+      {"title": "Buy boxes and tape", "minutes": 60, "due_days_before": 14},
+      {"title": "Declutter", "minutes": 240, "due_days_before": 10},
+      {"title": "Pack non-essentials", "minutes": 360, "due_days_before": 5},
+      {"title": "Update address everywhere", "minutes": 60, "due_days_before": 3},
+      {"title": "Pack essentials", "minutes": 180, "due_days_before": 1},
+      {"title": "Final clean", "minutes": 180, "due_days_before": 0}
+    ]
+  },
+  {
+    "name": "Exam",
+    "horizon_days": 21,
+    "tasks": [
+      {"title": "Gather materials and make a study plan", "minutes": 90, "due_days_before": 18},
+      {"title": "Review all topics", "minutes": 600, "due_days_before": 5},
+      {"title": "Practice tests", "minutes": 360, "due_days_before": 2},
+      {"title": "Prepare supplies and route", "minutes": 30, "due_days_before": 1},
+      {"title": "Final light review", "minutes": 120, "due_days_before": 0}
+    ]
+  },
+  {
+    "name": "Job interview",
+    "horizon_days": 10,
+    "tasks": [
+      {"title": "Research the company", "minutes": 120, "due_days_before": 3},
+      {"title": "Prepare stories and questions", "minutes": 180, "due_days_before": 2},
+      {"title": "Mock interview", "minutes": 60, "due_days_before": 1},
+      {"title": "Prepare outfit and documents", "minutes": 30, "due_days_before": 1},
+      {"title": "Plan the route", "minutes": 15, "due_days_before": 0}
+    ]
+  },
+  {
+    "name": "Trip",
+    "horizon_days": 21,
+    "tasks": [
+      {"title": "Book transport", "minutes": 60, "due_days_before": 14},
+      {"title": "Book accommodation", "minutes": 60, "due_days_before": 14},
+      {"title": "Plan itinerary", "minutes": 120, "due_days_before": 5},
+      {"title": "Check passport, tickets and insurance", "minutes": 30, "due_days_before": 3},
+      {"title": "Pack", "minutes": 120, "due_days_before": 1}
+    ]
+  },
+  {
+    "name": "Product launch",
+    "horizon_days": 30,
+    "tasks": [
+      {"title": "Lock the scope", "minutes": 120, "due_days_before": 21},
+      {"title": "Write the announcement", "minutes": 180, "due_days_before": 7},
+      {"title": "Prepare the demo", "minutes": 240, "due_days_before": 5},
+      {"title": "QA pass", "minutes": 240, "due_days_before": 3},
+      {"title": "Schedule posts", "minutes": 60, "due_days_before": 1},
+      {"title": "Final checks", "minutes": 60, "due_days_before": 0}
+    ]
+  }
+]

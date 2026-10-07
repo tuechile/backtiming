@@ -1,3 +1,5 @@
+from datetime import time
+
 from pydantic import AwareDatetime, BaseModel, Field
 
 
@@ -20,6 +22,30 @@ class TaskIn(BaseModel):
 class Task(TaskIn):
     id: int
     event_id: int
+
+
+class TemplateIn(BaseModel):
+    name: str
+    horizon_days: int = Field(default=14, ge=1)
+    tasks: list[TaskIn] = []
+
+
+class Template(TemplateIn):
+    id: int
+
+
+class EventCreate(EventIn):
+    template_id: int | None = None
+
+
+class SaveTemplate(BaseModel):
+    name: str
+
+
+class Settings(BaseModel):
+    sleep_enabled: bool = True
+    sleep_start: time = time(2)
+    sleep_end: time = time(9)
 
 
 class Block(BaseModel):

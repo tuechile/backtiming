@@ -8,11 +8,12 @@ backtiming is open source and self-hosted: you run it on your own machine with y
 
 ## How it works
 
-1. **Add an event** — title, date/time, and how far ahead you want to start preparing.
+1. **Add an event** — title, date/time, and how far ahead you want to start preparing. Pick a template (wedding, move, exam, interview, trip, launch) to prefill the prep list.
 2. **List the prep tasks** — each with an estimated duration and an optional "must be done by" offset (e.g. "buy suit — 2h — at least 7 days before").
 3. **Read your calendar** — backtiming pulls your busy times between now and the event.
 4. **Allocate** — tasks are placed into free slots, latest-deadline-first working backwards, with a small buffer around existing events. By default any time is fair game (24/7).
-5. **Review and push** — you see the proposed blocks, adjust if needed, then write them to the `backtiming` calendar.
+5. **Reuse** — save any event's tasks as a template for next time.
+6. **Review and push** — you see the proposed blocks, adjust if needed, then write them to the `backtiming` calendar.
 
 ## Stack
 
