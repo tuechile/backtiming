@@ -1,9 +1,3 @@
-CLAUDE.md
-CLAUDE.local.md
-.claude/
-.claudeignore
-.mcp.json
-
 __pycache__/
 *.py[cod]
 .venv/
